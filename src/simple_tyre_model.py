@@ -10,6 +10,15 @@ no cliff. This is a stepping stone before the fitted model in tyre_model.py.
 """
 
 
+COMPOUNDS = {
+    "SOFT":   {"wear_per_lap": 3.0, "seconds_per_health_lost": 0.03},
+    "MEDIUM": {"wear_per_lap": 2.0, "seconds_per_health_lost": 0.03},
+    "HARD":   {"wear_per_lap": 1.0, "seconds_per_health_lost": 0.03},
+}
+
+COMPOUND_COLORS = {"SOFT": "#E8002D", "MEDIUM": "#E8B800", "HARD": "#555555"}
+
+
 class SimpleTyre:
     def __init__(self, wear_per_lap: float = 2.0, seconds_per_health_lost: float = 0.03):
         """
@@ -41,11 +50,39 @@ def simulate_stint(num_laps: int, base_pace: float, wear_per_lap: float = 2.0,
     return lap_times, healths
 
 
+def plot_laptimes(laptimes_by_compound: dict, save_path: str | None = None) -> None:
+    """Plot lap-time evolution for each compound, one line per compound, no markers."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    for compound, lap_times in laptimes_by_compound.items():
+        laps = range(1, len(lap_times) + 1)
+        ax.plot(laps, lap_times, color=COMPOUND_COLORS.get(compound), label=compound)
+
+    ax.set_xlabel("Lap")
+    ax.set_ylabel("Lap Time (s)")
+    ax.set_title("Lap Time Evolution by Compound")
+    ax.legend()
+    ax.grid(alpha=0.3)
+
+    plt.tight_layout()
+    save_path = save_path or "simple_tyre_laptimes.png"
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"Plot saved -> {save_path}")
+
+
 if __name__ == "__main__":
     BASE_PACE = 90.0  # seconds, arbitrary placeholder
+    NUM_LAPS = 60
 
-    lap_times, healths = simulate_stint(num_laps=20, base_pace=BASE_PACE)
+    laptimes_by_compound = {}
+    for compound, params in COMPOUNDS.items():
+        lap_times, _ = simulate_stint(num_laps=NUM_LAPS, base_pace=BASE_PACE, **params)
+        laptimes_by_compound[compound] = lap_times
+        print(f"{compound}: lap1={lap_times[0]:.3f}s  lap{NUM_LAPS}={lap_times[-1]:.3f}s")
 
-    print(f"{'Lap':>3} {'Health':>7} {'LapTime':>9}")
-    for i, (t, h) in enumerate(zip(lap_times, healths), start=1):
-        print(f"{i:3d} {h:7.1f} {t:9.3f}")
+    plot_laptimes(laptimes_by_compound)
