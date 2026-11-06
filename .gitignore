@@ -3,3 +3,4 @@ LEARNING_PLAN.md
 
 # Python bytecode
 __pycache__/
+.venv
