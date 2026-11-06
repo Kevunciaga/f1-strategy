@@ -22,7 +22,7 @@ penalty to that lap; the predictor adds the pit loss.
 - Puncture on the final lap: no stop, the race ends.
 """
 
-from fuel_model import Fuel
+from fuel_model import fuel_penalty
 from tyre_model import WEAR_PER_LAP, has_punctured, tyre_penalty
 
 BASE_LAP_TIME = 90.0  # seconds, fastest compound (soft), fresh tyre, empty tank (placeholder)
@@ -41,13 +41,11 @@ def predict_race_time(num_laps: int, start_compound: str,
 
     planned = list(pit_stops)  # stops not yet taken
     compound, tyre_age = start_compound, 0
-    fuel = Fuel()
 
     lap_times = []
     stops_taken = []
     for lap in range(1, num_laps + 1):
-        lap_time = BASE_LAP_TIME + tyre_penalty(compound, tyre_age) + fuel.time_penalty()
-        fuel.drive_lap()
+        lap_time = BASE_LAP_TIME + tyre_penalty(compound, tyre_age) + fuel_penalty(lap - 1)
 
         new_compound = None
         if planned and planned[0][0] == lap:
