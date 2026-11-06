@@ -23,6 +23,8 @@ Requirements for the race time model (Goal 1). The optimiser (Goal 2) and in-rac
 
 1. **Strategy input.** The model takes a strategy as input: the starting tyre, and for each pit stop the lap number to pit on and the tyre compound to change to.
 2. **Tyre degradation model.** The model includes a tyre degradation model.
+   - *Placeholder rule, puncture:* a tyre punctures when its degradation reaches 100%. The puncture is assumed to happen at the start/finish line, adds a fixed time penalty to that lap, and forces a pit stop at the end of that lap. The rule is a simplification and will be revisited once real data is used.
+   - *Placeholder rule, forced stop:* the next planned stop is moved earlier to the puncture lap, keeping its planned compound. If no planned stop remains, the compound is chosen from the laps left: 10 or fewer soft, 20 or fewer medium, otherwise hard. A puncture on a planned pit lap is one stop. A puncture on the final lap causes no stop.
 3. **Lap time responds to degradation.** Lap time increases as tyre degradation increases.
    - *Deferred:* degradation differs by compound. Softs drop off more sharply than mediums, which drop off more sharply than hards.
 4. **Fuel load model.** The model includes a fuel load model. The car gets lighter as fuel burns off, so lap time decreases as the race progresses.
