@@ -1,0 +1,69 @@
+"""
+data_loader.py - Load a real race from FastF1 and turn it into model inputs.
+
+Two jobs:
+- Ground truth: each driver's real Strategy and real race time.
+- Training table: clean laps that show normal racing pace.
+"""
+
+import pandas as pd
+
+from strategy import PitStop, Strategy
+
+# TrackStatus codes: 2 yellow, 4 safety car, 5 red flag, 6 VSC, 7 VSC ending
+_DIRTY_STATUS_CODES = set("24567")
+
+
+def load_race(year: int, event, cache_dir: str = "cache") -> pd.DataFrame:
+    """Load race laps from FastF1. `event` is a round number or event name."""
+    import fastf1
+
+    fastf1.Cache.enable_cache(cache_dir)
+    session = fastf1.get_session(year, event, "R")
+    session.load(laps=True, telemetry=False, weather=False, messages=False)
+    laps = session.laps.copy()
+    laps["LapTimeSec"] = laps["LapTime"].dt.total_seconds()
+    return laps
+
+
+def has_wet_tyres(laps: pd.DataFrame) -> bool:
+    return bool(laps["Compound"].isin(["INTERMEDIATE", "WET"]).any())
+
+
+def clean_laps(laps: pd.DataFrame) -> pd.DataFrame:
+    """Keep laps that show normal pace: no pit laps, no lap 1, no yellow/SC/VSC/red."""
+    keep = (
+        laps["LapTimeSec"].notna()
+        & laps["PitInTime"].isna()
+        & laps["PitOutTime"].isna()
+        & (laps["LapNumber"] > 1)
+        & laps["IsAccurate"]
+        & laps["Deleted"].ne(True)
+        & ~laps["TrackStatus"].astype(str).apply(lambda s: bool(_DIRTY_STATUS_CODES & set(s)))
+    )
+    return laps[keep]
+
+
+def driver_strategy(driver_laps: pd.DataFrame) -> Strategy:
+    """Real strategy of one driver: start tyre plus a PitStop at the end of every stint but the last."""
+    stints = (
+        driver_laps.sort_values("LapNumber")
+        .groupby("Stint")
+        .agg(compound=("Compound", "first"), last_lap=("LapNumber", "max"))
+        .sort_index()
+    )
+    compounds = stints["compound"].tolist()
+    last_laps = stints["last_lap"].astype(int).tolist()
+    stops = tuple(PitStop(lap, compound)
+                  for lap, compound in zip(last_laps[:-1], compounds[1:]))
+    return Strategy(compounds[0], stops)
+
+
+def driver_race_time(driver_laps: pd.DataFrame) -> float:
+    """Total race time in seconds: sum of every lap time."""
+    return float(driver_laps["LapTimeSec"].sum())
+
+
+def estimate_base_pace(clean_driver_laps: pd.DataFrame, n: int = 5) -> float:
+    """Crude base pace: mean of the driver's n fastest clean laps. To be replaced by fitting."""
+    return float(clean_driver_laps["LapTimeSec"].nsmallest(n).mean())

@@ -6,3 +6,4 @@ __pycache__/
 .venv
 src/tyre_penalties.png
 cache/
+plots/
