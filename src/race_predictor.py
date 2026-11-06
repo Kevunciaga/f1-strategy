@@ -9,38 +9,73 @@ Strategy
 start_compound: tyre the race starts on, e.g. "MEDIUM"
 pit_stops:      list of (lap, compound). The car pits at the end of `lap` and
                 continues on a fresh tyre of `compound` from the next lap.
+
+Forced stops (puncture)
+-----------------------
+If a tyre punctures, the puncture is assumed to happen at the start/finish line
+and the car pits at the end of that lap. The tyre model adds the puncture time
+penalty to that lap; the predictor adds the pit loss.
+- Next planned stop exists: it is moved earlier to the puncture lap.
+- No planned stop left: compound is chosen from the laps remaining
+  (<= 10 SOFT, <= 20 MEDIUM, otherwise HARD).
+- Puncture on a planned pit lap: just change tyres, one stop.
+- Puncture on the final lap: no stop, the race ends.
 """
 
 from fuel_model import Fuel
-from tyre_model import WEAR_PER_LAP, Tyre
+from tyre_model import WEAR_PER_LAP, has_punctured, tyre_penalty
 
 BASE_LAP_TIME = 90.0  # seconds, fastest compound (soft), fresh tyre, empty tank (placeholder)
 PIT_LOSS = 21.0       # seconds lost per pit stop (placeholder)
 
 
 def predict_race_time(num_laps: int, start_compound: str,
-                      pit_stops: list[tuple[int, str]]) -> tuple[float, list[float]]:
-    """Return (total_race_time, lap_times) for a strategy."""
+                      pit_stops: list[tuple[int, str]]
+                      ) -> tuple[float, list[float], list[tuple[int, str]]]:
+    """Return (total_race_time, lap_times, stops_taken) for a strategy.
+
+    stops_taken lists every stop actually made as (lap, compound), including
+    forced ones and stops that were moved earlier.
+    """
     _check_strategy(num_laps, start_compound, pit_stops)
 
-    pit_compound_after = dict(pit_stops)
-    tyre = Tyre(start_compound)
+    planned = list(pit_stops)  # stops not yet taken
+    compound, tyre_age = start_compound, 0
     fuel = Fuel()
 
     lap_times = []
+    stops_taken = []
     for lap in range(1, num_laps + 1):
-        lap_time = BASE_LAP_TIME + tyre.time_penalty() + fuel.time_penalty()
-
-        tyre.drive_lap()
+        lap_time = BASE_LAP_TIME + tyre_penalty(compound, tyre_age) + fuel.time_penalty()
         fuel.drive_lap()
 
-        if lap in pit_compound_after:
+        new_compound = None
+        if planned and planned[0][0] == lap:
+            new_compound = planned.pop(0)[1]
+        elif has_punctured(compound, tyre_age) and lap < num_laps:
+            new_compound = _forced_stop_compound(planned, num_laps - lap)
+
+        if new_compound is None:
+            tyre_age += 1
+        else:
             lap_time += PIT_LOSS
-            tyre = Tyre(pit_compound_after[lap])
+            stops_taken.append((lap, new_compound))
+            compound, tyre_age = new_compound, 0
 
         lap_times.append(lap_time)
 
-    return sum(lap_times), lap_times
+    return sum(lap_times), lap_times, stops_taken
+
+
+def _forced_stop_compound(planned: list[tuple[int, str]], laps_left: int) -> str:
+    """Compound to fit after a puncture. Pulls the next planned stop forward."""
+    if planned:
+        return planned.pop(0)[1]
+    if laps_left <= 10:
+        return "SOFT"
+    if laps_left <= 20:
+        return "MEDIUM"
+    return "HARD"
 
 
 def _check_strategy(num_laps, start_compound, pit_stops) -> None:
@@ -69,12 +104,13 @@ if __name__ == "__main__":
 
     strategies = {
         "No stop (HARD)":            ("HARD", []),
-        "1 stop (SOFT -> HARD)":   ("SOFT", [(25, "HARD")]),
-        "1 stop (SOFT -> SOFT)":   ("SOFT", [(30, "SOFT")]),
-        "2 stop (SOFT-SOFT-SOFT)": ("SOFT", [(18, "SOFT"), (40, "SOFT")]),
+        "1 stop (SOFT -> HARD)":     ("SOFT", [(25, "HARD")]),
+        "1 stop (SOFT -> SOFT)":     ("SOFT", [(30, "SOFT")]),
+        "2 stop (SOFT-SOFT-SOFT)":   ("SOFT", [(18, "SOFT"), (40, "SOFT")]),
+        "No stop (SOFT), punctures": ("SOFT", []),
+        "Late stop, punctures first": ("SOFT", [(40, "HARD")]),
     }
 
     for name, (start, stops) in strategies.items():
-        total, lap_times = predict_race_time(NUM_LAPS, start, stops)
-        print(f"{name:28s} {format_time(total)}   "
-              f"lap 1 = {lap_times[0]:.2f}s  lap {NUM_LAPS} = {lap_times[-1]:.2f}s")
+        total, lap_times, stops_taken = predict_race_time(NUM_LAPS, start, stops)
+        print(f"{name:28s} {format_time(total)}   stops = {stops_taken}")

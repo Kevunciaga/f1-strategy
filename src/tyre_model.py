@@ -15,6 +15,9 @@ import matplotlib.pyplot as plt
 
 SECONDS_PER_HEALTH_LOST = 0.03  # lap time penalty per health point lost
 
+# Seconds added to the lap on which the tyre punctures (placeholder)
+PUNCTURE_PENALTY = 40.0
+
 # Seconds slower than the fastest compound (soft) on a fresh tyre (placeholders)
 FRESH_PACE_OFFSET = {"SOFT": 0.0, "MEDIUM": 0.5, "HARD": 1.0}
 
@@ -37,6 +40,28 @@ class Tyre:
     def drive_lap(self) -> None:
         """Wear the tyre by one lap."""
         self.health = max(0.0, self.health - WEAR_PER_LAP[self.compound])
+
+
+def tyre_penalty(compound: str, tyre_age: int) -> float:
+    """
+    Seconds a tyre adds to a lap, given its compound and age.
+
+    tyre_age: laps already driven on this set. Fresh tyre = 0.
+
+    Pure function: no state, no side effects. Same inputs always give the
+    same output. The old Tyre class gets this answer by looping drive_lap();
+    here you must get it straight from tyre_age.
+    """
+    health_lost = min(100.0, tyre_age * WEAR_PER_LAP[compound])
+    penalty = FRESH_PACE_OFFSET[compound] + health_lost * SECONDS_PER_HEALTH_LOST
+    if has_punctured(compound, tyre_age):
+        penalty += PUNCTURE_PENALTY
+    return penalty
+
+
+def has_punctured(compound: str, tyre_age: int) -> bool:
+    """True once the tyre has lost all 100 health. Placeholder rule."""
+    return tyre_age * WEAR_PER_LAP[compound] >= 100.0
 
 
 def stint_penalties(compound: str, num_laps: int) -> list[float]:
