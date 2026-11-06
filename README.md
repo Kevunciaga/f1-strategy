@@ -26,15 +26,18 @@ Requirements for the race time model (Goal 1). The optimiser (Goal 2) and in-rac
    - *Placeholder rule, puncture:* a tyre punctures when its degradation reaches 100%. The puncture is assumed to happen at the start/finish line, adds a fixed time penalty to that lap, and forces a pit stop at the end of that lap. The rule is a simplification and will be revisited once real data is used.
    - *Placeholder rule, forced stop:* the next planned stop is moved earlier to the puncture lap, keeping its planned compound. If no planned stop remains, the compound is chosen from the laps left: 10 or fewer soft, 20 or fewer medium, otherwise hard. A puncture on a planned pit lap is one stop. A puncture on the final lap causes no stop.
 3. **Lap time responds to degradation.** Lap time increases as tyre degradation increases.
-   - *Deferred:* degradation differs by compound. Softs drop off more sharply than mediums, which drop off more sharply than hards.
+   - Degradation differs by compound. Softs drop off more sharply than mediums, which drop off more sharply than hards.
+   - Fresh-tyre pace differs by compound. Softs are fastest on a fresh tyre, hards slowest.
+   - All values are placeholders until real data is used.
 4. **Fuel load model.** The model includes a fuel load model. The car gets lighter as fuel burns off, so lap time decreases as the race progresses.
-5. **Race time output.** The model outputs a total race time based on the strategy and the resulting lap times.
+5. **Pit stop time loss.** Each pit stop adds a fixed amount of time to the lap. The value is a placeholder and not yet track-specific.
+6. **Race time output.** The model outputs a total race time based on the strategy and the resulting lap times, including any forced stops.
 
 ## Other Factors Affecting Lap Time (Considered, Deferred)
 
 Brainstormed factors beyond the functional requirements above. None are in scope yet. Likely first candidates: base pace per track, and out-lap/in-lap effects.
 
-- **Tyre:** compound grip level, warm-up phase on fresh tyres, tyre cliff, tyre temperature and pressure, new vs used set.
+- **Tyre:** warm-up phase on fresh tyres, tyre cliff, tyre temperature and pressure, new vs used set.
 - **Track and weather:** track layout and length (sets base lap time), track and air temperature, rain and drying line, wind, track evolution (grip rises as rubber builds up).
 - **Car:** car performance and team strength, setup (downforce vs top speed), engine mode, energy deployment, car damage, component wear.
 - **Driver:** skill and consistency, pace management (lifting and coasting to save tyres or fuel), mistakes and track limits.
