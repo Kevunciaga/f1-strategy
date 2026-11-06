@@ -23,13 +23,11 @@ penalty to that lap; the predictor adds the pit loss.
 """
 
 from fuel_model import fuel_penalty
-from tyre_model import WEAR_PER_LAP, has_punctured, tyre_penalty
-
-BASE_LAP_TIME = 90.0  # seconds, fastest compound (soft), fresh tyre, empty tank (placeholder)
-PIT_LOSS = 21.0       # seconds lost per pit stop (placeholder)
+from params import DEFAULT_PARAMS, Params
+from tyre_model import has_punctured, tyre_penalty
 
 
-def predict_race_time(num_laps: int, start_compound: str,
+def predict_race_time(params: Params, num_laps: int, start_compound: str,
                       pit_stops: list[tuple[int, str]]
                       ) -> tuple[float, list[float], list[tuple[int, str]]]:
     """Return (total_race_time, lap_times, stops_taken) for a strategy.
@@ -37,7 +35,7 @@ def predict_race_time(num_laps: int, start_compound: str,
     stops_taken lists every stop actually made as (lap, compound), including
     forced ones and stops that were moved earlier.
     """
-    _check_strategy(num_laps, start_compound, pit_stops)
+    _check_strategy(params, num_laps, start_compound, pit_stops)
 
     planned = list(pit_stops)  # stops not yet taken
     compound, tyre_age = start_compound, 0
@@ -45,18 +43,19 @@ def predict_race_time(num_laps: int, start_compound: str,
     lap_times = []
     stops_taken = []
     for lap in range(1, num_laps + 1):
-        lap_time = BASE_LAP_TIME + tyre_penalty(compound, tyre_age) + fuel_penalty(lap - 1)
+        lap_time = (params.base_lap_time + tyre_penalty(params, compound, tyre_age)
+                    + fuel_penalty(params, lap - 1))
 
         new_compound = None
         if planned and planned[0][0] == lap:
             new_compound = planned.pop(0)[1]
-        elif has_punctured(compound, tyre_age) and lap < num_laps:
+        elif has_punctured(params, compound, tyre_age) and lap < num_laps:
             new_compound = _forced_stop_compound(planned, num_laps - lap)
 
         if new_compound is None:
             tyre_age += 1
         else:
-            lap_time += PIT_LOSS
+            lap_time += params.pit_loss
             stops_taken.append((lap, new_compound))
             compound, tyre_age = new_compound, 0
 
@@ -76,10 +75,10 @@ def _forced_stop_compound(planned: list[tuple[int, str]], laps_left: int) -> str
     return "HARD"
 
 
-def _check_strategy(num_laps, start_compound, pit_stops) -> None:
+def _check_strategy(params, num_laps, start_compound, pit_stops) -> None:
     compounds = [start_compound] + [c for _, c in pit_stops]
     for compound in compounds:
-        if compound not in WEAR_PER_LAP:
+        if compound not in params.wear_per_lap:
             raise ValueError(f"Unknown compound: {compound}")
 
     laps = [lap for lap, _ in pit_stops]
@@ -110,5 +109,5 @@ if __name__ == "__main__":
     }
 
     for name, (start, stops) in strategies.items():
-        total, lap_times, stops_taken = predict_race_time(NUM_LAPS, start, stops)
+        total, lap_times, stops_taken = predict_race_time(DEFAULT_PARAMS, NUM_LAPS, start, stops)
         print(f"{name:28s} {format_time(total)}   stops = {stops_taken}")
