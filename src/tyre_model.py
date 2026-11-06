@@ -1,17 +1,13 @@
 """
-tyre_model.py - Step 2: three compounds, each with its own constant wear rate.
+tyre_model.py - Tyre time penalty by compound and tyre age.
 
-A tyre starts at 100 health. Each lap it loses a constant amount of health
-set by its compound. Each compound also has a fresh-tyre pace offset: softs
-are fastest, hards slowest. The tyre adds a time penalty to the lap made of
-that offset plus a wear term in proportion to the health lost. Base lap time
+A tyre starts at 100 health and loses a constant amount per lap, set by its
+compound. Each compound also has a fresh-tyre pace offset: softs are fastest,
+hards slowest. The time penalty of a lap is that offset plus a wear term in
+proportion to the health lost. When all 100 health is gone the tyre punctures
+and the lap gets a large extra penalty. Pure functions: no state. Base lap time
 is owned by the predictor, not this model.
 """
-
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 SECONDS_PER_HEALTH_LOST = 0.03  # lap time penalty per health point lost
 
@@ -27,19 +23,9 @@ WEAR_PER_LAP = {"SOFT": 3.0, "MEDIUM": 2.0, "HARD": 1.0}
 COLOURS = {"SOFT": "#E8002D", "MEDIUM": "#E8B800", "HARD": "#555555"}
 
 
-class Tyre:
-    def __init__(self, compound: str):
-        self.compound = compound
-        self.health = 100.0
-
-    def time_penalty(self) -> float:
-        """Seconds added to a lap: fresh pace offset plus wear at current health."""
-        health_lost = 100.0 - self.health
-        return FRESH_PACE_OFFSET[self.compound] + health_lost * SECONDS_PER_HEALTH_LOST
-
-    def drive_lap(self) -> None:
-        """Wear the tyre by one lap."""
-        self.health = max(0.0, self.health - WEAR_PER_LAP[self.compound])
+def has_punctured(compound: str, tyre_age: int) -> bool:
+    """True once the tyre has lost all 100 health. Placeholder rule."""
+    return tyre_age * WEAR_PER_LAP[compound] >= 100.0
 
 
 def tyre_penalty(compound: str, tyre_age: int) -> float:
@@ -47,10 +33,6 @@ def tyre_penalty(compound: str, tyre_age: int) -> float:
     Seconds a tyre adds to a lap, given its compound and age.
 
     tyre_age: laps already driven on this set. Fresh tyre = 0.
-
-    Pure function: no state, no side effects. Same inputs always give the
-    same output. The old Tyre class gets this answer by looping drive_lap();
-    here you must get it straight from tyre_age.
     """
     health_lost = min(100.0, tyre_age * WEAR_PER_LAP[compound])
     penalty = FRESH_PACE_OFFSET[compound] + health_lost * SECONDS_PER_HEALTH_LOST
@@ -59,23 +41,18 @@ def tyre_penalty(compound: str, tyre_age: int) -> float:
     return penalty
 
 
-def has_punctured(compound: str, tyre_age: int) -> bool:
-    """True once the tyre has lost all 100 health. Placeholder rule."""
-    return tyre_age * WEAR_PER_LAP[compound] >= 100.0
-
-
 def stint_penalties(compound: str, num_laps: int) -> list[float]:
     """Tyre time penalty for each lap of a stint on one fresh tyre."""
-    tyre = Tyre(compound)
-    penalties = []
-    for _ in range(num_laps):
-        penalties.append(tyre.time_penalty())
-        tyre.drive_lap()
-    return penalties
+    return [tyre_penalty(compound, age) for age in range(num_laps)]
 
 
 def plot_penalties(num_laps: int, save_path: str = "tyre_penalties.png") -> None:
     """Plot tyre time penalty against lap for each compound."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(8, 5))
     for compound in WEAR_PER_LAP:
         penalties = stint_penalties(compound, num_laps)
