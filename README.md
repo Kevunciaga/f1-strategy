@@ -39,6 +39,7 @@ Brainstormed factors beyond the functional requirements above. None are in scope
 
 - **Tyre:** warm-up phase on fresh tyres, tyre cliff, tyre temperature and pressure, new vs used set.
 - **Track and weather:** track layout and length (sets base lap time), track and air temperature, rain and drying line, wind, track evolution (grip rises as rubber builds up).
+- **Wet weather (deferred):** wet-weather tyres (intermediate and full wet compounds) and the effect of rain on lap time. Wet races are excluded from the data for now, and only dry compounds (soft, medium, hard) are modelled.
 - **Car:** car performance and team strength, setup (downforce vs top speed), engine mode, energy deployment, car damage, component wear.
 - **Driver:** skill and consistency, pace management (lifting and coasting to save tyres or fuel), mistakes and track limits.
 - **Other cars and race state:** traffic and dirty air, DRS and slipstream, being lapped, track position, defending and attacking.
