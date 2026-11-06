@@ -5,3 +5,4 @@ LEARNING_PLAN.md
 __pycache__/
 .venv
 src/tyre_penalties.png
+cache/
