@@ -16,12 +16,13 @@ class Params:
     pit_loss: float = 21.0        # s lost per pit stop
 
     # Tyre
-    seconds_per_health_lost: float = 0.03  # s of lap time per health point lost
     puncture_penalty: float = 40.0         # s added to the lap on which a tyre punctures
     fresh_pace_offset: dict[str, float] = field(  # s slower than soft on a fresh tyre
         default_factory=lambda: {"SOFT": 0.0, "MEDIUM": 0.5, "HARD": 1.0})
-    wear_per_lap: dict[str, float] = field(       # health points lost per lap
-        default_factory=lambda: {"SOFT": 3.0, "MEDIUM": 2.0, "HARD": 1.0})
+    degradation_per_lap: dict[str, float] = field(  # s lost per lap of tyre age
+        default_factory=lambda: {"SOFT": 0.09, "MEDIUM": 0.06, "HARD": 0.03})
+    puncture_age: dict[str, int] = field(           # tyre age (laps) at which the tyre punctures
+        default_factory=lambda: {"SOFT": 34, "MEDIUM": 50, "HARD": 100})
 
     # Fuel
     initial_fuel_load: float = 110.0   # kg at race start

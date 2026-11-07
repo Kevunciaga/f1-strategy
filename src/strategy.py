@@ -54,7 +54,7 @@ class Strategy:
     def validate(self, params: Params, num_laps: int) -> None:
         """Raise ValueError if the strategy does not fit this race."""
         for compound in self.compounds:
-            if compound not in params.wear_per_lap:
+            if compound not in params.degradation_per_lap:
                 raise ValueError(f"Unknown compound: {compound}")
         if any(stop.lap >= num_laps for stop in self.pit_stops):
             raise ValueError(f"Pit laps must be between 1 and {num_laps - 1}")

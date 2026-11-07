@@ -1,11 +1,10 @@
 """
 tyre_model.py - Tyre time penalty by compound and tyre age.
 
-A tyre starts at 100 health and loses a constant amount per lap, set by its
-compound. Each compound also has a fresh-tyre pace offset: softs are fastest,
-hards slowest. The time penalty of a lap is that offset plus a wear term in
-proportion to the health lost. When all 100 health is gone the tyre punctures
-and the lap gets a large extra penalty. Pure functions: no state. All numbers
+Each compound has a fresh-tyre pace offset (softs fastest, hards slowest) and
+loses a fixed number of seconds per lap of tyre age. The time penalty of a lap
+is the offset plus degradation times tyre age. Once a tyre reaches its puncture
+age the lap gets a large extra penalty. Pure functions: no state. All numbers
 come from Params. Base lap time is owned by the predictor, not this model.
 """
 
@@ -15,8 +14,8 @@ COLOURS = {"SOFT": "#E8002D", "MEDIUM": "#E8B800", "HARD": "#555555"}
 
 
 def has_punctured(params: Params, compound: str, tyre_age: int) -> bool:
-    """True once the tyre has lost all 100 health. Placeholder rule."""
-    return tyre_age * params.wear_per_lap[compound] >= 100.0
+    """True once the tyre reaches its puncture age. Placeholder rule."""
+    return tyre_age >= params.puncture_age[compound]
 
 
 def tyre_penalty(params: Params, compound: str, tyre_age: int) -> float:
@@ -25,9 +24,8 @@ def tyre_penalty(params: Params, compound: str, tyre_age: int) -> float:
 
     tyre_age: laps already driven on this set. Fresh tyre = 0.
     """
-    health_lost = min(100.0, tyre_age * params.wear_per_lap[compound])
     penalty = (params.fresh_pace_offset[compound]
-               + health_lost * params.seconds_per_health_lost)
+               + tyre_age * params.degradation_per_lap[compound])
     if has_punctured(params, compound, tyre_age):
         penalty += params.puncture_penalty
     return penalty
@@ -47,7 +45,7 @@ def plot_penalties(params: Params, num_laps: int,
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    for compound in params.wear_per_lap:
+    for compound in params.degradation_per_lap:
         penalties = stint_penalties(params, compound, num_laps)
         ax.plot(range(1, num_laps + 1), penalties,
                 color=COLOURS[compound], label=compound)

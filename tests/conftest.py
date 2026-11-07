@@ -3,9 +3,9 @@ Shared fixtures. Tests use their own round-number Params so expected values
 can be worked out by hand and do not change when the real defaults are fitted.
 
 With these numbers:
-  SOFT   punctures at tyre age 5   (5 x 20 health = 100)
-  MEDIUM punctures at tyre age 10  (10 x 10)
-  HARD   punctures at tyre age 20  (20 x 5)
+  SOFT   loses 2.0 s per lap of age, punctures at age 5
+  MEDIUM loses 1.0 s per lap of age, punctures at age 10
+  HARD   loses 0.5 s per lap of age, punctures at age 20
 """
 
 import pytest
@@ -15,10 +15,10 @@ from params import DEFAULT_PARAMS, Params
 TEST_PARAMS = Params(
     base_lap_time=100.0,
     pit_loss=20.0,
-    seconds_per_health_lost=0.1,
     puncture_penalty=50.0,
     fresh_pace_offset={"SOFT": 0.0, "MEDIUM": 1.0, "HARD": 2.0},
-    wear_per_lap={"SOFT": 20.0, "MEDIUM": 10.0, "HARD": 5.0},
+    degradation_per_lap={"SOFT": 2.0, "MEDIUM": 1.0, "HARD": 0.5},
+    puncture_age={"SOFT": 5, "MEDIUM": 10, "HARD": 20},
     initial_fuel_load=50.0,
     fuel_burn_per_lap=2.0,
     seconds_per_kg=0.1,
