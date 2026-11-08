@@ -2,15 +2,16 @@
 compare_real.py - Feed real strategies of a few drivers to the model and
 compare the predicted race time with the real one.
 
-Base pace comes from each driver's fastest clean laps. Everything else is the
-placeholder DEFAULT_PARAMS, so the errors show how far the placeholders are off.
+Params are fitted on the clean laps of the same race (fit_params.py), with one
+base pace per driver. The fit has seen these laps, so the errors are optimistic:
+this is an in-sample check. evaluate.py tests on a different race.
 """
 
 from dataclasses import replace
 
 from data_loader import (clean_laps, driver_race_time, driver_strategy,
-                         estimate_base_pace, has_wet_tyres, load_race)
-from params import DEFAULT_PARAMS
+                         has_wet_tyres, load_race)
+from fit_params import fit_params
 from race_predictor import format_time, predict_race_time
 from strategy import Strategy
 
@@ -52,8 +53,11 @@ def main() -> None:
     laps = load_race(YEAR, EVENT)
     assert not has_wet_tyres(laps), "wet race, not supported yet"
     clean = clean_laps(laps)
+    fitted = fit_params(clean)
 
-    print(f"{YEAR} {EVENT}: {len(laps)} laps, {len(clean)} clean\n")
+    print(f"{YEAR} {EVENT}: {len(laps)} laps, {len(clean)} clean")
+    print(f"fitted: {fitted.params.degradation_per_lap}, offsets {fitted.params.fresh_pace_offset}, "
+          f"{fitted.params.seconds_per_kg:.4f} s/kg, noise {fitted.noise:.2f} s\n")
     header = f"{'Drv':3} {'Laps':>4}  {'Real':>11} {'Model':>11} {'Error':>8}  Strategy"
     print(header)
 
@@ -64,8 +68,7 @@ def main() -> None:
         strategy = driver_strategy(driver_laps)
         real_time = driver_race_time(driver_laps)
 
-        base_pace = estimate_base_pace(clean[clean["Driver"] == driver])
-        params = replace(DEFAULT_PARAMS, base_lap_time=base_pace)
+        params = replace(fitted.params, base_lap_time=fitted.driver_base_lap_time[driver])
         predicted, lap_times, stops_taken = predict_race_time(params, num_laps, strategy)
 
         forced = " (forced stop)" if len(stops_taken) != strategy.num_stops else ""

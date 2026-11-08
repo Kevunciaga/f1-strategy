@@ -23,6 +23,14 @@ def load_race(year: int, event, cache_dir: str = "cache") -> pd.DataFrame:
     session.load(laps=True, telemetry=False, weather=False, messages=False)
     laps = session.laps.copy()
     laps["LapTimeSec"] = laps["LapTime"].dt.total_seconds()
+    return add_tyre_age(laps)
+
+
+def add_tyre_age(laps: pd.DataFrame) -> pd.DataFrame:
+    """Add TyreAge: laps since the stint started. FastF1's TyreLife also counts laps on used start tyres."""
+    laps = laps.copy()
+    first_lap = laps.groupby(["Driver", "Stint"])["LapNumber"].transform("min")
+    laps["TyreAge"] = laps["LapNumber"] - first_lap
     return laps
 
 
