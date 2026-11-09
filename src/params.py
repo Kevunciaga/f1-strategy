@@ -14,6 +14,7 @@ class Params:
     # Race
     base_lap_time: float = 90.0   # s, fastest compound (soft), fresh tyre, empty tank
     pit_loss: float = 21.0        # s lost per pit stop
+    start_penalty: float = 0.0    # s added to lap 1 (standing start, bunched cars)
 
     # Tyre
     puncture_penalty: float = 40.0         # s added to the lap on which a tyre punctures

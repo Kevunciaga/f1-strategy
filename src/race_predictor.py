@@ -43,6 +43,9 @@ def predict_race_time(params: Params, num_laps: int, strategy: Strategy
         lap_time = (params.base_lap_time + tyre_penalty(params, compound, tyre_age)
                     + fuel_penalty(params, lap - 1))
 
+        if lap == 1:
+            lap_time += params.start_penalty
+
         new_compound = None
         if planned and planned[0].lap == lap:
             new_compound = planned.pop(0).compound

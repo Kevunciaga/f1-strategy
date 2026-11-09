@@ -21,7 +21,13 @@ def load_race(year: int, event, cache_dir: str = "cache") -> pd.DataFrame:
     fastf1.Cache.enable_cache(cache_dir)
     session = fastf1.get_session(year, event, "R")
     session.load(laps=True, telemetry=False, weather=False, messages=False)
-    laps = session.laps.copy()
+    try:
+        laps = session.laps.copy()
+    except Exception as error:
+        raise RuntimeError(
+            f"Could not load laps for {year} {event}. FastF1 needs an F1 account login "
+            f"(env vars F1_USERNAME and F1_PASSWORD) to download recent races that are not cached."
+        ) from error
     laps["LapTimeSec"] = laps["LapTime"].dt.total_seconds()
     return add_tyre_age(laps)
 

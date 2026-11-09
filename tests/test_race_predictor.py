@@ -125,3 +125,18 @@ def test_puncture_on_final_lap_makes_no_stop_and_pays_no_pit_loss(params):
     _, lap_times, stops = predict_race_time(params, 6, Strategy("SOFT"))
     assert stops == []
     assert lap_times[5] == pytest.approx(164.0)
+
+
+# --- start penalty -----------------------------------------------------------
+
+def test_start_penalty_is_added_to_lap_one_only(params):
+    slower_start = replace(params, start_penalty=7.5)
+    _, base_laps, _ = predict_race_time(params, 6, Strategy("HARD"))
+    _, slow_laps, _ = predict_race_time(slower_start, 6, Strategy("HARD"))
+    assert slow_laps[0] - base_laps[0] == pytest.approx(7.5)
+    assert slow_laps[1:] == pytest.approx(base_laps[1:])
+
+
+def test_start_penalty_defaults_to_zero():
+    from params import DEFAULT_PARAMS
+    assert DEFAULT_PARAMS.start_penalty == 0.0
