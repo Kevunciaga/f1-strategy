@@ -13,40 +13,58 @@ import sys
 import numpy as np
 
 from data_loader import clean_laps, has_wet_tyres, load_race
-from fit_params import estimate_start_and_pit, fit_params
+from fit_params import RaceEstimates, estimate_start_and_pit, fit_params
 
 
-def main(event: str, years: list[int]) -> None:
-    rows = []
-    print(f"{event}\n")
-    print(f"{'year':>4}  {'lap 1':>7}  {'pit stop':>9}  {'cars':>4}  {'stops':>5}")
+def estimate_track(event: str, years: list[int], verbose: bool = True) -> list[tuple[int, RaceEstimates]]:
+    """Estimate lap 1 and pit stop cost for every usable race of `event` in `years`."""
+    results = []
+    if verbose:
+        print(f"{event}")
+        print(f"{'year':>4}  {'lap 1':>7}  {'pit stop':>9}  {'cars':>4}  {'stops':>5}")
     for year in years:
         try:
             laps = load_race(year, event)
         except RuntimeError as error:
-            print(f"{year:>4}  skipped: could not load ({str(error)[:60]}...)")
+            if verbose:
+                print(f"{year:>4}  skipped: could not load")
             continue
         if has_wet_tyres(laps):
-            print(f"{year:>4}  skipped: wet tyres used")
+            if verbose:
+                print(f"{year:>4}  skipped: wet tyres used")
             continue
         try:
             fit = fit_params(clean_laps(laps))
         except ValueError as error:
-            print(f"{year:>4}  skipped: {error}")
+            if verbose:
+                print(f"{year:>4}  skipped: {error}")
             continue
         est = estimate_start_and_pit(laps, fit)
-        rows.append(est)
-        print(f"{year:>4}  {est.start_penalty:6.1f}s  {est.pit_stop_cost:8.1f}s  "
-              f"{est.n_start_laps:4d}  {est.n_stops:5d}")
+        results.append((year, est))
+        if verbose:
+            print(f"{year:>4}  {est.start_penalty:6.1f}s  {est.pit_stop_cost:8.1f}s  "
+                  f"{est.n_start_laps:4d}  {est.n_stops:5d}")
+    return results
 
-    if not rows:
+
+def summarise(results: list[tuple[int, RaceEstimates]]) -> tuple[float, float, float, float]:
+    """Mean and spread of lap 1 and pit stop cost over races. Races without a value are left out."""
+    start = np.array([est.start_penalty for _, est in results], dtype=float)
+    pit = np.array([est.pit_stop_cost for _, est in results], dtype=float)
+    start, pit = start[~np.isnan(start)], pit[~np.isnan(pit)]
+    spread = lambda v: float(v.std(ddof=1)) if len(v) > 1 else float("nan")
+    return (float(start.mean()) if len(start) else float("nan"), spread(start),
+            float(pit.mean()) if len(pit) else float("nan"), spread(pit))
+
+
+def main(event: str, years: list[int]) -> None:
+    results = estimate_track(event, years)
+    if not results:
         print("no usable races")
         return
-    start = np.array([r.start_penalty for r in rows])
-    pit = np.array([r.pit_stop_cost for r in rows])
-    spread = lambda v: v.std(ddof=1) if len(v) > 1 else float("nan")
-    print(f"\n{len(rows)} races   lap 1: {start.mean():.1f}s (spread {spread(start):.1f})"
-          f"   pit stop: {pit.mean():.1f}s (spread {spread(pit):.1f})")
+    start, start_spread, pit, pit_spread = summarise(results)
+    print(f"\n{len(results)} races   lap 1: {start:.1f}s (spread {start_spread:.1f})"
+          f"   pit stop: {pit:.1f}s (spread {pit_spread:.1f})")
 
 
 if __name__ == "__main__":
