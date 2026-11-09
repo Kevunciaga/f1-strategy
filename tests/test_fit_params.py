@@ -11,7 +11,8 @@ from strategy import PitStop, Strategy
 
 TRUE = Params(
     base_lap_time=80.0,
-    pit_loss=24.0,
+    pit_in_loss=4.0,
+    pit_out_loss=20.0,
     start_penalty=7.0,
     fresh_pace_offset={"SOFT": 0.0, "MEDIUM": 0.4, "HARD": 0.9},
     degradation_per_lap={"SOFT": 0.12, "MEDIUM": 0.07, "HARD": 0.03},
@@ -31,7 +32,7 @@ STRATEGIES = {
 
 def made_up_race():
     """Every lap of a noise-free race produced by the simulator itself, with pit and status columns."""
-    pit_time = pd.Timestamp("2021-01-01")
+    lane_seconds = 21.0
     rows = []
     for driver, strategy in STRATEGIES.items():
         params = Params(**{**TRUE.__dict__, "base_lap_time": TRUE.base_lap_time + DRIVER_PACE[driver]})
@@ -41,11 +42,15 @@ def made_up_race():
                 rows.append({
                     "Driver": driver, "Stint": stint, "Compound": compound,
                     "LapNumber": lap, "TyreAge": lap - first, "LapTimeSec": lap_times[lap - 1],
-                    "PitInTime": pit_time if (lap == last and last != NUM_LAPS) else pd.NaT,
-                    "PitOutTime": pit_time if (lap == first and first != 1) else pd.NaT,
+                    "PitInTime": pd.to_timedelta(100 * lap, unit="s") if (lap == last and last != NUM_LAPS) else None,
+                    "PitOutTime": (pd.to_timedelta(100 * (first - 1) + lane_seconds, unit="s")
+                                   if (lap == first and first != 1) else None),
                     "TrackStatus": "1", "IsAccurate": True, "Deleted": False,
                 })
-    return pd.DataFrame(rows)
+    table = pd.DataFrame(rows)
+    for column in ("PitInTime", "PitOutTime"):
+        table[column] = pd.to_timedelta(table[column])
+    return table
 
 
 @pytest.fixture(scope="module")
@@ -94,10 +99,13 @@ def test_redundant_columns_raise(race):
         fit_params(one_stint)
 
 
-def test_recovers_start_penalty_and_pit_stop_cost(race, result):
+def test_recovers_start_penalty_and_pit_losses(race, result):
     estimates = estimate_start_and_pit(race, result)
     assert estimates.start_penalty == pytest.approx(TRUE.start_penalty, abs=1e-6)
+    assert estimates.pit_in_loss == pytest.approx(TRUE.pit_in_loss, abs=1e-6)
+    assert estimates.pit_out_loss == pytest.approx(TRUE.pit_out_loss, abs=1e-6)
     assert estimates.pit_stop_cost == pytest.approx(TRUE.pit_loss, abs=1e-6)
+    assert estimates.pit_lane_time == pytest.approx(21.0, abs=1e-6)
     assert estimates.n_start_laps == len(STRATEGIES)
     assert estimates.n_stops == sum(s.num_stops for s in STRATEGIES.values())
 

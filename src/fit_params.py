@@ -92,9 +92,16 @@ def fit_params(clean: pd.DataFrame, template: Params = DEFAULT_PARAMS) -> FitRes
 @dataclass(frozen=True)
 class RaceEstimates:
     start_penalty: float   # mean lap 1 time above what the fitted model expects, seconds
-    pit_stop_cost: float   # mean in-lap plus out-lap time above expected, per stop, seconds
+    pit_in_loss: float     # mean in-lap time above expected, seconds
+    pit_out_loss: float    # mean out-lap time above expected, seconds
+    pit_lane_time: float   # median time from pit entry to pit exit, seconds (information only)
     n_start_laps: int
     n_stops: int
+
+    @property
+    def pit_stop_cost(self) -> float:
+        """Total time one stop costs: in-lap plus out-lap loss. Includes the time stationary in the box."""
+        return self.pit_in_loss + self.pit_out_loss
 
 
 # Safety Car, red flag, VSC: laps under these are slow for reasons unrelated to the start or the stop
@@ -122,9 +129,14 @@ def estimate_start_and_pit(laps: pd.DataFrame, fit: FitResult) -> RaceEstimates:
     in_lap = usable & laps["PitInTime"].notna()
     out_lap = usable & laps["PitOutTime"].notna() & (laps["LapNumber"] > 1)
 
+    next_pit_out = laps.sort_values(["Driver", "LapNumber"]).groupby("Driver")["PitOutTime"].shift(-1)
+    lane_seconds = (next_pit_out - laps["PitInTime"]).dt.total_seconds()
+
     return RaceEstimates(
         start_penalty=float(excess[lap1].mean()),
-        pit_stop_cost=float(excess[in_lap].mean() + excess[out_lap].mean()),
+        pit_in_loss=float(excess[in_lap].mean()),
+        pit_out_loss=float(excess[out_lap].mean()),
+        pit_lane_time=float(lane_seconds[in_lap].median()),
         n_start_laps=int(lap1.sum()),
         n_stops=int(in_lap.sum()),
     )

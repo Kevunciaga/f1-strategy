@@ -9,7 +9,7 @@ from track_params import TRACKS, TrackEstimate, params_for_track
 
 def test_tracks_cannot_be_changed_at_run_time():
     with pytest.raises(TypeError):
-        TRACKS["Nowhere"] = TrackEstimate(1.0, 2.0, (2021,), (2021,))
+        TRACKS["Nowhere"] = TrackEstimate(1.0, 2.0, 3.0, 4.0, (2021,), (2021,))
 
 
 def test_track_entries_cannot_be_changed_at_run_time():
@@ -22,7 +22,8 @@ def test_params_for_track_fills_in_start_penalty_and_pit_loss():
     track = next(name for name, e in TRACKS.items() if e.start_penalty is not None and e.pit_loss is not None)
     params = params_for_track(track)
     assert params.start_penalty == TRACKS[track].start_penalty
-    assert params.pit_loss == TRACKS[track].pit_loss
+    assert params.pit_in_loss == TRACKS[track].pit_in_loss
+    assert params.pit_out_loss == TRACKS[track].pit_out_loss
 
 
 def test_params_for_track_keeps_everything_else_from_the_template():
@@ -34,10 +35,12 @@ def test_params_for_track_keeps_everything_else_from_the_template():
 
 
 def test_a_missing_number_keeps_the_template_value(monkeypatch):
-    fake = MappingProxyType({"Nowhere": TrackEstimate(None, 22.0, (), (2021,))})
+    fake = MappingProxyType({"Nowhere": TrackEstimate(None, 6.0, 16.0, None, (), (2021,))})
     monkeypatch.setattr(track_params, "TRACKS", fake)
     params = track_params.params_for_track("Nowhere")
     assert params.start_penalty == DEFAULT_PARAMS.start_penalty
+    assert params.pit_in_loss == 6.0
+    assert params.pit_out_loss == 16.0
     assert params.pit_loss == 22.0
 
 

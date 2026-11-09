@@ -72,3 +72,19 @@ def test_wet_tyre_detection():
     wet = laps_table([{"LapNumber": 1}, {"LapNumber": 2, "Compound": "INTERMEDIATE"}])
     assert not has_wet_tyres(dry)
     assert has_wet_tyres(wet)
+
+
+def test_event_check_accepts_the_requested_race():
+    from data_loader import check_event_matches
+    info = {"EventName": "Italian Grand Prix", "OfficialEventName": "FORMULA 1 PIRELLI GRAN PREMIO D'ITALIA 2022",
+            "Location": "Monza", "Country": "Italy"}
+    check_event_matches(info, "Monza", 2022)
+    check_event_matches(info, "italy", 2022)
+
+
+def test_event_check_rejects_a_substituted_race():
+    from data_loader import check_event_matches
+    info = {"EventName": "Italian Grand Prix", "OfficialEventName": "FORMULA 1 PIRELLI GRAN PREMIO D'ITALIA 2020",
+            "Location": "Monza", "Country": "Italy"}
+    with pytest.raises(RuntimeError, match="did not take place"):
+        check_event_matches(info, "Monaco", 2020)

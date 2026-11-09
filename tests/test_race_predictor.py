@@ -1,6 +1,6 @@
 """
 Expected values are worked out by hand from the TEST_PARAMS in conftest.py.
-Lap time = 100 + tyre penalty + fuel penalty (+ 20 if a stop is made that lap).
+Lap time = 100 + tyre penalty + fuel penalty. A stop adds 5 s on its own lap and 15 s on the lap after.
 Fuel penalty by lap: 5.0, 4.8, 4.6, 4.4, ...
 """
 
@@ -27,11 +27,11 @@ def test_no_stop_race_matches_hand_calculation(params):
 
 
 def test_planned_stop_matches_hand_calculation(params):
-    # HARD, stop after lap 2 onto SOFT. Lap 2 pays the 20 s pit loss.
+    # HARD, stop after lap 2 onto SOFT. Lap 2 pays the 5 s in-lap loss, lap 3 the 15 s out-lap loss.
     # Lap 3: fresh soft = 100 + 0 + 4.6. Lap 4: soft age 1 = 100 + 2.0 + 4.4.
     strategy = Strategy("HARD", (PitStop(2, "SOFT"),))
     total, lap_times, stops = predict_race_time(params, 4, strategy)
-    assert lap_times == pytest.approx([107.0, 127.3, 104.6, 106.4])
+    assert lap_times == pytest.approx([107.0, 112.3, 119.6, 106.4])
     assert total == pytest.approx(445.3)
     assert stop_pairs(stops) == [(2, "SOFT")]
 
@@ -51,7 +51,7 @@ def test_one_lap_time_per_lap_and_total_is_their_sum(any_params, strategy):
 
 def test_each_stop_adds_exactly_the_pit_loss(params):
     strategy = Strategy("HARD", (PitStop(3, "MEDIUM"), PitStop(7, "HARD")))
-    slower = replace(params, pit_loss=params.pit_loss + 5.0)
+    slower = replace(params, pit_in_loss=params.pit_in_loss + 5.0)
     base_total, _, stops = predict_race_time(params, 12, strategy)
     slower_total, _, _ = predict_race_time(slower, 12, strategy)
     assert len(stops) == 2
@@ -84,10 +84,10 @@ def test_replacement_tyre_can_puncture_too(params):
     assert stop_pairs(stops) == [(6, "MEDIUM"), (17, "SOFT")]
 
 
-def test_forced_stop_lap_pays_puncture_penalty_and_pit_loss(params):
-    # lap 6: 100 + (0 + 10.0 wear + 50 puncture) + fuel 4.0 + 20 pit loss
+def test_forced_stop_lap_pays_puncture_penalty_and_in_lap_loss(params):
+    # lap 6: 100 + (0 + 10.0 wear + 50 puncture) + fuel 4.0 + 5 in-lap loss
     _, lap_times, _ = predict_race_time(params, 20, Strategy("SOFT"))
-    assert lap_times[5] == pytest.approx(184.0)
+    assert lap_times[5] == pytest.approx(169.0)
 
 
 def test_forced_stop_moves_next_planned_stop_earlier(params):
@@ -106,7 +106,7 @@ def test_puncture_on_planned_pit_lap_is_one_stop(params):
     strategy = Strategy("SOFT", (PitStop(6, "HARD"),))
     _, lap_times, stops = predict_race_time(params, 20, strategy)
     assert stop_pairs(stops) == [(6, "HARD")]
-    assert lap_times[5] == pytest.approx(184.0)
+    assert lap_times[5] == pytest.approx(169.0)
 
 
 @pytest.mark.parametrize("num_laps, expected_compound", [
@@ -140,3 +140,26 @@ def test_start_penalty_is_added_to_lap_one_only(params):
 def test_start_penalty_defaults_to_zero():
     from params import DEFAULT_PARAMS
     assert DEFAULT_PARAMS.start_penalty == 0.0
+
+
+# --- in-lap and out-lap pit loss ---------------------------------------------
+
+def test_out_lap_loss_lands_on_the_lap_after_the_stop(params):
+    strategy = Strategy("HARD", (PitStop(3, "HARD"),))
+    no_out_loss = replace(params, pit_out_loss=0.0)
+    _, with_loss, _ = predict_race_time(params, 8, strategy)
+    _, without_loss, _ = predict_race_time(no_out_loss, 8, strategy)
+    differences = [a - b for a, b in zip(with_loss, without_loss)]
+    assert differences == pytest.approx([0, 0, 0, 15.0, 0, 0, 0, 0])
+
+
+def test_splitting_pit_loss_does_not_change_race_total(params):
+    strategy = Strategy("HARD", (PitStop(3, "MEDIUM"), PitStop(7, "HARD")))
+    all_in_lap = replace(params, pit_in_loss=params.pit_loss, pit_out_loss=0.0)
+    total_split, _, _ = predict_race_time(params, 12, strategy)
+    total_in_lap, _, _ = predict_race_time(all_in_lap, 12, strategy)
+    assert total_split == pytest.approx(total_in_lap)
+
+
+def test_pit_loss_is_in_lap_plus_out_lap(params):
+    assert params.pit_loss == pytest.approx(params.pit_in_loss + params.pit_out_loss)

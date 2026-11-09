@@ -30,8 +30,20 @@ def load_race(year: int, event, cache_dir: str = "cache") -> pd.DataFrame:
             f"Could not load laps for {year} {event}. FastF1 needs an F1 account login "
             f"(env vars F1_USERNAME and F1_PASSWORD) to download recent races that are not cached."
         ) from error
+    if isinstance(event, str):
+        check_event_matches(session.event, event, year)
+    laps["EventName"] = session.event["EventName"]
     laps["LapTimeSec"] = laps["LapTime"].dt.total_seconds()
     return add_tyre_age(laps)
+
+
+def check_event_matches(info, requested: str, year: int) -> None:
+    """FastF1 matches names loosely and returns the nearest race if the requested one did not happen."""
+    fields = ("EventName", "OfficialEventName", "Location", "Country")
+    haystack = " ".join(str(info[field]) for field in fields).lower()
+    if requested.lower() not in haystack:
+        raise RuntimeError(f"Asked for {requested!r} in {year}, FastF1 returned {info['EventName']!r}: "
+                           f"that race did not take place or the name does not match")
 
 
 def add_tyre_age(laps: pd.DataFrame) -> pd.DataFrame:

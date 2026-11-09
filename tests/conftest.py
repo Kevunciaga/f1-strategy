@@ -14,7 +14,8 @@ from params import DEFAULT_PARAMS, Params
 
 TEST_PARAMS = Params(
     base_lap_time=100.0,
-    pit_loss=20.0,
+    pit_in_loss=5.0,
+    pit_out_loss=15.0,
     puncture_penalty=50.0,
     fresh_pace_offset={"SOFT": 0.0, "MEDIUM": 1.0, "HARD": 2.0},
     degradation_per_lap={"SOFT": 2.0, "MEDIUM": 1.0, "HARD": 0.5},

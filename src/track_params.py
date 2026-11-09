@@ -7,9 +7,12 @@ time: nobody can change it by accident while the program runs. To change a
 number, edit this file.
 
 start_penalty: seconds lap 1 is slower than the model expects (standing start)
-pit_loss:      seconds one pit stop costs (in-lap plus out-lap)
+pit_in_loss:   seconds lost on the in-lap of a stop
+pit_out_loss:  seconds lost on the out-lap (pit lane, stationary time, cold tyres)
+pit_lane_time: seconds from pit entry to pit exit. Information only: it is already
+               inside the in-lap and out-lap losses and is never added to anything.
 start_years:   the races lap 1 was averaged over
-pit_years:     the races the pit stop cost was averaged over
+pit_years:     the races the pit losses were averaged over
 
 None means "not measured": lap 1 is ignored when a red flag or Safety Car neutralised
 it in every available race, so params_for_track keeps the template's value.
@@ -24,19 +27,28 @@ from params import DEFAULT_PARAMS, Params
 @dataclass(frozen=True)
 class TrackEstimate:
     start_penalty: float | None
-    pit_loss: float | None
+    pit_in_loss: float | None
+    pit_out_loss: float | None
+    pit_lane_time: float | None
     start_years: tuple[int, ...]
     pit_years: tuple[int, ...]
 
+    @property
+    def pit_loss(self) -> float | None:
+        """Total cost of one stop, or None if either part is missing."""
+        if self.pit_in_loss is None or self.pit_out_loss is None:
+            return None
+        return self.pit_in_loss + self.pit_out_loss
+
 
 TRACKS = MappingProxyType({
-    # paste lines from build_track_table.py here
-    "Zandvoort": TrackEstimate(8.2, 24.2, (2021, 2022, 2024), (2021, 2022, 2024)),
-    "Barcelona": TrackEstimate(7.8, 24.1, (2022, 2023, 2024), (2022, 2023, 2024)),
-    "Jeddah": TrackEstimate(5.8, 27.0, (2021, 2023, 2024), (2021, 2023, 2024)),
-    "Monaco": TrackEstimate(12.7, 15.3, (2021,), (2021, 2024)),
-    "Monza": TrackEstimate(6.4, 26.1, (2022,), (2022,)),
-    "Silverstone": TrackEstimate(7.3, 23.0, (2023,), (2021, 2022, 2023)),
+    # paste lines from build_track_table.py here (2021 to 2025 races only)
+    "Zandvoort": TrackEstimate(8.1, 5.2, 19.8, 19.5, (2021, 2022, 2024, 2025), (2021, 2022, 2024, 2025)),
+    "Barcelona": TrackEstimate(7.5, 4.6, 19.5, 22.3, (2022, 2023, 2024, 2025), (2022, 2023, 2024, 2025)),
+    "Jeddah": TrackEstimate(5.8, 6.8, 20.2, 23.8, (2021, 2023, 2024), (2021, 2023, 2024)),
+    "Monaco": TrackEstimate(11.6, 13.4, 3.0, 24.1, (2021, 2025), (2021, 2024, 2025)),
+    "Monza": TrackEstimate(6.2, 5.0, 21.8, 24.8, (2022, 2025), (2022, 2025)),
+    "Silverstone": TrackEstimate(7.3, 1.6, 21.4, 28.9, (2023,), (2021, 2022, 2023)),
 })
 
 
@@ -48,5 +60,6 @@ def params_for_track(track: str, template: Params = DEFAULT_PARAMS) -> Params:
     return replace(
         template,
         start_penalty=template.start_penalty if estimate.start_penalty is None else estimate.start_penalty,
-        pit_loss=template.pit_loss if estimate.pit_loss is None else estimate.pit_loss,
+        pit_in_loss=template.pit_in_loss if estimate.pit_in_loss is None else estimate.pit_in_loss,
+        pit_out_loss=template.pit_out_loss if estimate.pit_out_loss is None else estimate.pit_out_loss,
     )

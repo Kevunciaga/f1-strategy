@@ -48,19 +48,23 @@ def main(names: list[str]) -> None:
             print(f"{name}: no usable races in {MAIN_YEARS[0]} to {MAIN_YEARS[-1]}\n")
             continue
 
-        start, start_spread, pit, pit_spread = summarise(main_results)
-        print(f"{name}: {len(main_results)} races {MAIN_YEARS[0]}-{MAIN_YEARS[-1]}, "
-              f"lap 1 {show(start)}s (spread {show(start_spread)}), "
-              f"pit stop {show(pit)}s (spread {show(pit_spread)})")
+        t = summarise(main_results)
+        print(f"{name}: {len(main_results)} races {MAIN_YEARS[0]}-{MAIN_YEARS[-1]}: "
+              f"lap 1 {show(t.start_penalty)}s (spread {show(t.start_spread)}), "
+              f"in-lap {show(t.pit_in_loss)}s, out-lap {show(t.pit_out_loss)}s, "
+              f"pit stop {show(t.pit_in_loss + t.pit_out_loss)}s (spread {show(t.pit_spread)}), "
+              f"time in pit lane {show(t.pit_lane_time)}s")
         if new_results:
-            new_start, _, new_pit, _ = summarise(new_results)
-            print(f"{name}: 2026 regulations: lap 1 {show(new_start)}s ({new_start - start:+.1f}), "
-                  f"pit stop {show(new_pit)}s ({new_pit - pit:+.1f}) versus the average above")
+            n = summarise(new_results)
+            print(f"{name}: 2026 regulations: lap 1 {show(n.start_penalty)}s ({n.start_penalty - t.start_penalty:+.1f}), "
+                  f"in-lap {show(n.pit_in_loss)}s ({n.pit_in_loss - t.pit_in_loss:+.1f}), "
+                  f"out-lap {show(n.pit_out_loss)}s ({n.pit_out_loss - t.pit_out_loss:+.1f}) versus the average above")
         print()
 
         start_years = tuple(y for y, e in main_results if e.start_penalty == e.start_penalty)
-        pit_years = tuple(y for y, e in main_results if e.pit_stop_cost == e.pit_stop_cost)
-        lines.append(f'    "{name}": TrackEstimate({show(start)}, {show(pit)}, {start_years}, {pit_years}),')
+        pit_years = tuple(y for y, e in main_results if e.pit_in_loss == e.pit_in_loss)
+        lines.append(f'    "{name}": TrackEstimate({show(t.start_penalty)}, {show(t.pit_in_loss)}, '
+                     f'{show(t.pit_out_loss)}, {show(t.pit_lane_time)}, {start_years}, {pit_years}),')
 
     print("Paste into TRACKS in src/track_params.py (2021 to 2025 only):\n")
     print("\n".join(lines))

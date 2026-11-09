@@ -1,8 +1,10 @@
 """
 race_predictor.py - Predict total race time for a strategy.
 
-The predictor owns base lap time and pit loss. For each lap it asks the tyre
-model and the fuel model for their time penalties and sums everything up.
+The predictor owns base lap time, start penalty and pit losses. For each lap it
+asks the tyre model and the fuel model for their time penalties and sums
+everything up. A pit stop costs pit_in_loss on the lap of the stop and
+pit_out_loss on the lap after it.
 
 The strategy (starting tyre and planned pit stops) is a Strategy from
 strategy.py.
@@ -11,7 +13,7 @@ Forced stops (puncture)
 -----------------------
 If a tyre punctures, the puncture is assumed to happen at the start/finish line
 and the car pits at the end of that lap. The tyre model adds the puncture time
-penalty to that lap; the predictor adds the pit loss.
+penalty to that lap; the predictor adds the in-lap and out-lap pit losses.
 - Next planned stop exists: it is moved earlier to the puncture lap.
 - No planned stop left: compound is chosen from the laps remaining
   (<= 10 SOFT, <= 20 MEDIUM, otherwise HARD).
@@ -39,9 +41,11 @@ def predict_race_time(params: Params, num_laps: int, strategy: Strategy
 
     lap_times = []
     stops_taken = []
+    out_lap_loss = 0.0   # owed on the lap after a stop
     for lap in range(1, num_laps + 1):
         lap_time = (params.base_lap_time + tyre_penalty(params, compound, tyre_age)
-                    + fuel_penalty(params, lap - 1))
+                    + fuel_penalty(params, lap - 1) + out_lap_loss)
+        out_lap_loss = 0.0
 
         if lap == 1:
             lap_time += params.start_penalty
@@ -55,7 +59,8 @@ def predict_race_time(params: Params, num_laps: int, strategy: Strategy
         if new_compound is None:
             tyre_age += 1
         else:
-            lap_time += params.pit_loss
+            lap_time += params.pit_in_loss
+            out_lap_loss = params.pit_out_loss
             stops_taken.append(PitStop(lap, new_compound))
             compound, tyre_age = new_compound, 0
 
