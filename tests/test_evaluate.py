@@ -30,13 +30,16 @@ def test_calibrated_base_pace_equals_the_driver_base_pace_in_noise_free_data():
     assert calibrate_base(race.fit.params, driver_clean) == pytest.approx(race.fit.driver_base_lap_time["BBB"])
 
 
-def test_average_tyre_fuel_params_is_the_mean_over_races():
+def test_average_tyre_fuel_params_is_the_median_over_races():
     base = make_race().fit
-    low = replace(base, params=replace(base.params, degradation_per_lap={"SOFT": 0.1, "MEDIUM": 0.1, "HARD": 0.1}, seconds_per_kg=0.02))
-    high = replace(base, params=replace(base.params, degradation_per_lap={"SOFT": 0.3, "MEDIUM": 0.3, "HARD": 0.3}, seconds_per_kg=0.04))
-    mean = average_tyre_fuel_params([low, high])
-    assert mean.degradation_per_lap["SOFT"] == pytest.approx(0.2)
-    assert mean.seconds_per_kg == pytest.approx(0.03)
+
+    def fit_with(deg, kg):
+        return replace(base, params=replace(base.params, degradation_per_lap={"SOFT": deg, "MEDIUM": deg, "HARD": deg},
+                                            seconds_per_kg=kg))
+
+    median = average_tyre_fuel_params([fit_with(0.1, 0.02), fit_with(0.2, 0.03), fit_with(5.0, 0.90)])
+    assert median.degradation_per_lap["SOFT"] == pytest.approx(0.2)
+    assert median.seconds_per_kg == pytest.approx(0.03)
 
 
 def test_missing_track_value_falls_back_to_other_tracks():

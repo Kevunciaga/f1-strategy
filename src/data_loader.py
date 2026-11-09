@@ -6,6 +6,8 @@ Two jobs:
 - Training table: clean laps that show normal racing pace.
 """
 
+from pathlib import Path
+
 import pandas as pd
 
 from env_file import load_env_file
@@ -14,13 +16,16 @@ from strategy import PitStop, Strategy
 # TrackStatus codes: 2 yellow, 4 safety car, 5 red flag, 6 VSC, 7 VSC ending
 _DIRTY_STATUS_CODES = set("24567")
 
+# the project's cache folder, wherever the script is run from
+DEFAULT_CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
 
-def load_race(year: int, event, cache_dir: str = "cache") -> pd.DataFrame:
+
+def load_race(year: int, event, cache_dir: Path | str = DEFAULT_CACHE_DIR) -> pd.DataFrame:
     """Load race laps from FastF1. `event` is a round number or event name."""
     import fastf1
 
     load_env_file()   # F1_USERNAME and F1_PASSWORD from .env, if present
-    fastf1.Cache.enable_cache(cache_dir)
+    fastf1.Cache.enable_cache(str(cache_dir))
     try:
         session = fastf1.get_session(year, event, "R")
         session.load(laps=True, telemetry=False, weather=False, messages=False)

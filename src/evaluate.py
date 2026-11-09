@@ -75,13 +75,23 @@ def _mean(values) -> float:
     return float(values.mean()) if len(values) else float("nan")
 
 
+def _median(values) -> float:
+    values = np.array(values, dtype=float)
+    values = values[~np.isnan(values)]
+    return float(np.median(values)) if len(values) else float("nan")
+
+
 def average_tyre_fuel_params(fits: list[FitResult], template: Params = DEFAULT_PARAMS) -> Params:
-    """Mean degradation, compound offsets and fuel effect over several fitted races."""
+    """Median degradation, compound offsets and fuel effect over several fitted races.
+
+    Median, not mean: a few races with little running on one compound give extreme
+    fits (e.g. Jeddah 2021 soft +0.77 s/lap) that would drag a mean far off.
+    """
     return replace(
         template,
-        degradation_per_lap={c: _mean([f.params.degradation_per_lap[c] for f in fits]) for c in COMPOUNDS},
-        fresh_pace_offset={c: _mean([f.params.fresh_pace_offset[c] for f in fits]) for c in COMPOUNDS},
-        seconds_per_kg=_mean([f.params.seconds_per_kg for f in fits]),
+        degradation_per_lap={c: _median([f.params.degradation_per_lap[c] for f in fits]) for c in COMPOUNDS},
+        fresh_pace_offset={c: _median([f.params.fresh_pace_offset[c] for f in fits]) for c in COMPOUNDS},
+        seconds_per_kg=_median([f.params.seconds_per_kg for f in fits]),
     )
 
 
