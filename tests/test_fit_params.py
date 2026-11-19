@@ -17,6 +17,7 @@ TRUE = Params(
     fresh_pace_offset={"SOFT": 0.0, "MEDIUM": 0.4, "HARD": 0.9},
     degradation_per_lap={"SOFT": 0.12, "MEDIUM": 0.07, "HARD": 0.03},
     seconds_per_kg=0.032,
+    first_stint_age_effect=-0.02,
 )
 NUM_LAPS = 60
 DRIVER_PACE = {"AAA": 0.0, "BBB": 0.8, "CCC": -0.5, "DDD": 1.4, "EEE": 0.3, "FFF": -0.2}
@@ -75,6 +76,19 @@ def test_recovers_compound_offsets(result):
 
 def test_recovers_fuel_effect(result):
     assert result.params.seconds_per_kg == pytest.approx(TRUE.seconds_per_kg, abs=1e-6)
+
+
+def test_recovers_first_stint_effect(result):
+    assert result.params.first_stint_age_effect == pytest.approx(TRUE.first_stint_age_effect, abs=1e-6)
+
+
+def test_without_stint_1_laps_the_first_stint_effect_is_zero_and_the_rest_still_fits(race):
+    clean = clean_laps(race)
+    later = fit_params(clean[clean["Stint"] > 1])
+    assert later.params.first_stint_age_effect == 0.0
+    assert "first_stint_age" not in later.std_errors
+    for compound, true_value in TRUE.degradation_per_lap.items():
+        assert later.params.degradation_per_lap[compound] == pytest.approx(true_value, abs=1e-6)
 
 
 def test_recovers_each_drivers_base_pace(result):

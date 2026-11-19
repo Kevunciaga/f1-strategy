@@ -5,10 +5,16 @@ Ported from learning notebook 03. One least-squares fit over every clean lap:
 
     lap time = driver pace + compound offset
                + degradation[compound] * tyre age + c * lap number
+               + first stint effect * tyre age (stint 1 laps only)
 
 Driver pace is fitted per driver. Offsets are relative to SOFT. The fuel effect
 c is shared by all drivers and converted to seconds per kg with the burn rate in
 Params.
+
+The first stint term is there because stint 1 laps get quicker as the field
+spreads out, drivers stop managing and the track rubbers in. Without it, that
+effect is blamed on whichever compound runs most in stint 1 (usually the medium),
+and its wear comes out too low: omitted variable bias, see learning notebook 05.
 """
 
 from dataclasses import dataclass, replace
@@ -27,14 +33,17 @@ COMPOUNDS = ("SOFT", "MEDIUM", "HARD")
 class FitResult:
     params: Params                          # base_lap_time is the mean over drivers
     driver_base_lap_time: dict[str, float]  # base_lap_time per driver
-    std_errors: dict[str, float]            # uncertainty of each fitted coefficient
+    std_errors: dict[str, float]            # uncertainty of each fitted coefficient; no "first_stint_age"
+                                            # entry means the race had no clean stint 1 laps to fit it on
     noise: float                            # std of the left-over lap time error, seconds
 
 
 def fit_params(clean: pd.DataFrame, template: Params = DEFAULT_PARAMS) -> FitResult:
     """Fit fresh_pace_offset, degradation_per_lap, seconds_per_kg and base pace.
 
-    `clean` needs the columns Driver, Compound, TyreAge, LapNumber, LapTimeSec.
+    `clean` needs the columns Driver, Stint, Compound, TyreAge, LapNumber, LapTimeSec.
+    If there are no clean stint 1 laps (e.g. red flag on lap 1), the first stint
+    effect cannot be fitted and is set to 0.
     Everything not fitted (pit loss, fuel load, burn rate, puncture rule) is
     copied from `template`.
     """
@@ -55,6 +64,10 @@ def fit_params(clean: pd.DataFrame, template: Params = DEFAULT_PARAMS) -> FitRes
         names.append(f"deg_{compound}")
     columns.append(clean["LapNumber"].to_numpy(dtype=float))
     names.append("lap")
+    first_stint_age = ((clean["Stint"] == 1) * clean["TyreAge"]).to_numpy(dtype=float)
+    if first_stint_age.any():
+        columns.append(first_stint_age)
+        names.append("first_stint_age")
 
     X = np.column_stack(columns)
     y = clean["LapTimeSec"].to_numpy(dtype=float)
@@ -80,6 +93,7 @@ def fit_params(clean: pd.DataFrame, template: Params = DEFAULT_PARAMS) -> FitRes
         fresh_pace_offset={"SOFT": 0.0,
                            **{c: float(coef[f"offset_{c}"]) for c in COMPOUNDS[1:]}},
         degradation_per_lap={c: float(coef[f"deg_{c}"]) for c in COMPOUNDS},
+        first_stint_age_effect=float(coef.get("first_stint_age", 0.0)),
     )
     return FitResult(
         params=params,
@@ -87,6 +101,14 @@ def fit_params(clean: pd.DataFrame, template: Params = DEFAULT_PARAMS) -> FitRes
         std_errors=dict(zip(names, (float(v) for v in std_errors))),
         noise=float(np.sqrt(noise_var)),
     )
+
+
+def model_penalty(params: Params, compound: str, tyre_age: int, lap: int, stint: int) -> float:
+    """Lap time above base pace that the model expects: tyre + fuel + first stint effect."""
+    penalty = tyre_penalty(params, compound, tyre_age) + fuel_penalty(params, lap - 1)
+    if stint == 1:
+        penalty += params.first_stint_age_effect * tyre_age
+    return penalty
 
 
 @dataclass(frozen=True)
@@ -117,9 +139,10 @@ def estimate_start_and_pit(laps: pd.DataFrame, fit: FitResult) -> RaceEstimates:
     """
     expected = [
         fit.driver_base_lap_time.get(driver, np.nan)
-        + tyre_penalty(fit.params, compound, int(age)) + fuel_penalty(fit.params, int(lap) - 1)
+        + model_penalty(fit.params, compound, int(age), int(lap), stint)
         if isinstance(compound, str) else np.nan
-        for driver, compound, age, lap in zip(laps["Driver"], laps["Compound"], laps["TyreAge"], laps["LapNumber"])
+        for driver, compound, age, lap, stint
+        in zip(laps["Driver"], laps["Compound"], laps["TyreAge"], laps["LapNumber"], laps["Stint"])
     ]
     excess = laps["LapTimeSec"] - np.array(expected)
     neutralised = laps["TrackStatus"].astype(str).apply(lambda status: bool(_NEUTRALISED & set(status)))

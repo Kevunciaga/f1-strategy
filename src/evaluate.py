@@ -26,12 +26,11 @@ import pandas as pd
 from build_track_table import MAIN_YEARS, NEW_REGS_YEARS, TRACKS
 from data_loader import (clean_laps, driver_race_time, driver_strategy,
                          has_wet_tyres, load_race)
-from fit_params import COMPOUNDS, FitResult, RaceEstimates, estimate_start_and_pit, fit_params
-from fuel_model import fuel_penalty
+from fit_params import (COMPOUNDS, FitResult, RaceEstimates, estimate_start_and_pit, fit_params,
+                        model_penalty)
 from params import DEFAULT_PARAMS, Params
 from race_predictor import predict_race_time
 from track_estimates import KNOWN_COMPOUND_NAMES
-from tyre_model import tyre_penalty
 
 TARGET_SECONDS = 30.0
 
@@ -82,16 +81,19 @@ def _median(values) -> float:
 
 
 def average_tyre_fuel_params(fits: list[FitResult], template: Params = DEFAULT_PARAMS) -> Params:
-    """Median degradation, compound offsets and fuel effect over several fitted races.
+    """Median degradation, compound offsets, fuel effect and first stint effect over several fitted races.
 
     Median, not mean: a few races with little running on one compound give extreme
     fits (e.g. Jeddah 2021 soft +0.77 s/lap) that would drag a mean far off.
+    The first stint effect only counts races where it could be fitted.
     """
+    first_stint = [f.params.first_stint_age_effect for f in fits if "first_stint_age" in f.std_errors]
     return replace(
         template,
         degradation_per_lap={c: _median([f.params.degradation_per_lap[c] for f in fits]) for c in COMPOUNDS},
         fresh_pace_offset={c: _median([f.params.fresh_pace_offset[c] for f in fits]) for c in COMPOUNDS},
         seconds_per_kg=_median([f.params.seconds_per_kg for f in fits]),
+        first_stint_age_effect=_median(first_stint) if first_stint else 0.0,
     )
 
 
@@ -105,20 +107,21 @@ def average_track_losses(estimates: list[RaceEstimates], fallback: list[RaceEsti
 
 
 def zero_tyre_and_fuel(params: Params) -> Params:
-    """The baseline: no tyre wear, no compound offsets, no fuel effect."""
+    """The baseline: no tyre wear, no compound offsets, no fuel effect, no first stint effect."""
     return replace(
         params,
         degradation_per_lap={c: 0.0 for c in COMPOUNDS},
         fresh_pace_offset={c: 0.0 for c in COMPOUNDS},
         seconds_per_kg=0.0,
+        first_stint_age_effect=0.0,
     )
 
 
 def calibrate_base(params: Params, clean_driver_laps: pd.DataFrame) -> float:
-    """A driver's pace: mean of (lap time - tyre penalty - fuel penalty) over their clean laps."""
-    penalties = [tyre_penalty(params, c, int(a)) + fuel_penalty(params, int(l) - 1)
-                 for c, a, l in zip(clean_driver_laps["Compound"], clean_driver_laps["TyreAge"],
-                                    clean_driver_laps["LapNumber"])]
+    """A driver's pace: mean of (lap time - what the model expects tyres and fuel to cost) over their clean laps."""
+    penalties = [model_penalty(params, c, int(a), int(l), s)
+                 for c, a, l, s in zip(clean_driver_laps["Compound"], clean_driver_laps["TyreAge"],
+                                       clean_driver_laps["LapNumber"], clean_driver_laps["Stint"])]
     return float(np.mean(clean_driver_laps["LapTimeSec"].to_numpy() - np.array(penalties)))
 
 

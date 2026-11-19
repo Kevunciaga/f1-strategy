@@ -48,26 +48,31 @@ Requirements for the race time model (Goal 1). The optimiser (Goal 2) and in-rac
 **Method.** Each race is fitted on its own with least squares over every clean lap of every driver (`src/fit_params.py`). Clean laps exclude lap 1, in-laps and out-laps, deleted or inaccurate laps, and laps under Safety Car, VSC, red flag or yellow flags. The fitted equation is:
 
     lap time = driver pace + compound offset + degradation[compound] x tyre age + fuel effect x lap number
+               + first stint effect x tyre age (stint 1 laps only)
 
 The fuel effect per lap is converted to seconds per kg with the 1.8 kg per lap burn rate. Tyre wear and fuel burn can only be told apart because pit stops reset tyre age but not fuel load. The fit is solved directly with the normal equation.
+
+**Why the first stint effect.** In stint 1, laps get quicker as the stint goes on: the field spreads out, drivers stop managing and the track rubbers in. Without a term for this, the effect was blamed on the medium, the compound that most often starts the race, and medium wear came out at about half the soft's and below the hard's. Races with no clean stint 1 laps (a red flag or Safety Car early on) cannot fit this term. It is set to 0 for them and left out of the median.
 
 **Values.** Median over the 19 dry races from 2021 to 2025 that could be fitted, at Zandvoort, Barcelona, Jeddah, Monaco, Monza and Silverstone:
 
 | | Soft | Medium | Hard |
 |---|---|---|---|
-| Degradation, seconds per lap of tyre age | 0.059 | 0.030 | 0.038 |
-| Fresh-tyre offset against the soft, seconds | 0.00 | 0.28 | 0.13 |
+| Degradation, seconds per lap of tyre age | 0.070 | 0.044 | 0.044 |
+| Fresh-tyre offset against the soft, seconds | 0.00 | 0.29 | 0.10 |
 
-- **Fuel effect:** 0.029 seconds per kg, close to the commonly quoted rule of thumb of 0.03.
+- **First stint effect:** -0.010 seconds per lap of tyre age, from the 16 races where it could be fitted.
+- **Fuel effect:** 0.030 seconds per kg, matching the commonly quoted rule of thumb.
 - **Lap-to-lap noise:** 0.68 seconds per lap is left unexplained in a typical race.
-- **Spread between races is large.** Degradation depends strongly on the track and the year. A few races give unrealistic values (for example Jeddah 2021 and Silverstone 2022, where few drivers ran some compounds). The median is shown, and used when combining races in the evaluation, because these races pull the mean far off: the mean medium degradation is slightly negative.
-- **The offsets are not reliable yet.** In single races they are often not clearly different from zero, and the medians do not show the expected order (soft fastest, hard slowest).
+- **Spread between races is large.** Degradation depends strongly on the track and the year. A few races give unrealistic values (for example Jeddah 2021 and Silverstone 2022, where few drivers ran some compounds). The median is shown, and used when combining races in the evaluation, because these races pull the mean far off.
+- **Medium and hard cannot be told apart yet.** Their median wear is equal. For the fresh-tyre offsets, the gap between medium and hard is within the noise in 9 of 15 races, with the rest split both ways.
+- **Used tyres are not modelled.** Tyre age counts laps since the stint started, so a used set is treated as new. About half of soft stints start on a used set, mostly left over from qualifying, so soft wear is somewhat overstated. Counting the earlier laps on the set would need the strategy input to say how old each set is.
 
 ## Results So Far
 
 Tested with `src/evaluate.py`. Every race from 2021 to 2025 is predicted with tyre, fuel and per-track numbers from the other races only (leave-one-race-out). 2026 races are predicted with numbers from 2021 to 2025.
 
-- **Races without Safety Car, VSC or red flag:** average error 6.3 seconds per driver, 97% of drivers within the 30 second target, worst miss 58.8 seconds.
+- **Races without Safety Car, VSC or red flag:** average error 6.3 seconds per driver, 97% of drivers within the 30 second target, worst miss 57.7 seconds.
 - **Races with Safety Car, VSC or red flag laps:** misses of 100 seconds or more, because these events are not modelled yet (Goal 3). All 2026 races so far had such laps, so the 2026 target cannot be tested yet.
 - **Known limit:** each driver's base pace is calibrated from their own clean laps in the race being predicted. Because of this, a baseline without any tyre or fuel model scores almost the same. A stricter test is planned that calibrates pace on part of the race and predicts the rest.
 

@@ -36,6 +36,15 @@ def test_planned_stop_matches_hand_calculation(params):
     assert stop_pairs(stops) == [(2, "SOFT")]
 
 
+def test_first_stint_effect_applies_only_before_the_first_stop(params):
+    # -0.1 s per lap of tyre age in stint 1. HARD, stop after lap 2 onto SOFT.
+    # Laps 1-2 have tyre age 0 and 1, so only lap 2 changes (-0.1). Stint 2 is untouched.
+    strategy = Strategy("HARD", (PitStop(2, "SOFT"),))
+    _, plain, _ = predict_race_time(params, 4, strategy)
+    _, with_effect, _ = predict_race_time(replace(params, first_stint_age_effect=-0.1), 4, strategy)
+    assert [b - a for a, b in zip(plain, with_effect)] == pytest.approx([0.0, -0.1, 0.0, 0.0])
+
+
 # --- invariants --------------------------------------------------------------
 
 @pytest.mark.parametrize("strategy", [

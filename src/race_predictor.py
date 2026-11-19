@@ -4,7 +4,9 @@ race_predictor.py - Predict total race time for a strategy.
 The predictor owns base lap time, start penalty and pit losses. For each lap it
 asks the tyre model and the fuel model for their time penalties and sums
 everything up. A pit stop costs pit_in_loss on the lap of the stop and
-pit_out_loss on the lap after it.
+pit_out_loss on the lap after it. In the first stint, each lap of tyre age also
+adds first_stint_age_effect (negative in real races: laps get quicker as the
+field spreads out).
 
 The strategy (starting tyre and planned pit stops) is a Strategy from
 strategy.py.
@@ -38,6 +40,7 @@ def predict_race_time(params: Params, num_laps: int, strategy: Strategy
 
     planned = list(strategy.pit_stops)  # stops not yet taken
     compound, tyre_age = strategy.start_compound, 0
+    stint = 1
 
     lap_times = []
     stops_taken = []
@@ -49,6 +52,8 @@ def predict_race_time(params: Params, num_laps: int, strategy: Strategy
 
         if lap == 1:
             lap_time += params.start_penalty
+        if stint == 1:
+            lap_time += params.first_stint_age_effect * tyre_age
 
         new_compound = None
         if planned and planned[0].lap == lap:
@@ -63,6 +68,7 @@ def predict_race_time(params: Params, num_laps: int, strategy: Strategy
             out_lap_loss = params.pit_out_loss
             stops_taken.append(PitStop(lap, new_compound))
             compound, tyre_age = new_compound, 0
+            stint += 1
 
         lap_times.append(lap_time)
 

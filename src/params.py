@@ -2,8 +2,8 @@
 params.py - Every number the race time model uses, in one place.
 
 The model functions hold the logic. This object holds the numbers. Different
-tracks or fitted values are just different Params. All defaults are
-placeholders until real data is used.
+tracks or fitted values are just different Params. The defaults are
+placeholders: real values come from fit_params.py and track_params.py.
 """
 
 from dataclasses import dataclass, field
@@ -25,6 +25,8 @@ class Params:
         default_factory=lambda: {"SOFT": 0.09, "MEDIUM": 0.06, "HARD": 0.03})
     puncture_age: dict[str, int] = field(           # tyre age (laps) at which the tyre punctures
         default_factory=lambda: {"SOFT": 34, "MEDIUM": 50, "HARD": 100})
+    first_stint_age_effect: float = 0.0    # s per lap of tyre age, added in stint 1 only (traffic, tyre
+                                           # management, track rubbering in; fitted values are negative)
 
     # Fuel
     initial_fuel_load: float = 110.0   # kg at race start

@@ -42,6 +42,19 @@ def test_average_tyre_fuel_params_is_the_median_over_races():
     assert median.seconds_per_kg == pytest.approx(0.03)
 
 
+def test_first_stint_effect_median_skips_races_where_it_was_not_fitted():
+    base = make_race().fit
+
+    def fit_with(effect, fitted=True):
+        errors = dict(base.std_errors)
+        if not fitted:
+            errors.pop("first_stint_age")
+        return replace(base, params=replace(base.params, first_stint_age_effect=effect), std_errors=errors)
+
+    median = average_tyre_fuel_params([fit_with(-0.02), fit_with(-0.04), fit_with(0.0, fitted=False)])
+    assert median.first_stint_age_effect == pytest.approx(-0.03)
+
+
 def test_missing_track_value_falls_back_to_other_tracks():
     nan = float("nan")
     track = [RaceEstimates(nan, 4.0, 20.0, 21.0, 0, 5)]
@@ -57,6 +70,7 @@ def test_zero_baseline_removes_tyre_and_fuel_effects():
     assert set(baseline.degradation_per_lap.values()) == {0.0}
     assert set(baseline.fresh_pace_offset.values()) == {0.0}
     assert baseline.seconds_per_kg == 0.0
+    assert baseline.first_stint_age_effect == 0.0
 
 
 def test_neutralised_laps_counts_laps_where_most_of_the_field_is_neutralised():
